@@ -56,6 +56,16 @@
     statChars: document.getElementById('stat-chars'),
     statWords: document.getElementById('stat-words'),
     statLines: document.getElementById('stat-lines'),
+    // History
+    btnHistory: document.getElementById('btn-history'),
+    historyPanel: document.getElementById('history-panel'),
+    historyEntries: document.getElementById('history-entries'),
+    historyCount: document.getElementById('history-count'),
+    historyClose: document.getElementById('history-close'),
+    historyClearAll: document.getElementById('history-clear-all'),
+    historyRestore: document.getElementById('history-restore'),
+    previewBannerOrig: document.getElementById('preview-banner-original'),
+    previewBannerResult: document.getElementById('preview-banner-result'),
   };
 
   // --- State ---
@@ -65,6 +75,9 @@
     diffActive: false,
     // Pipeline: ordered list of { op, enabled, params }
     pipeline: [],
+    // History preview: when viewing a history entry, store the live state
+    historyPreview: false,
+    liveState: null,  // { original, pipeline, result } saved when entering preview
   };
 
   // --- Initialization ---
@@ -80,6 +93,7 @@
     bindFindReplace();
     bindStatsUpdate();
     bindEffectsBar();
+    bindHistory();
     updateStats();
   }
 
@@ -372,6 +386,10 @@
 
         if (action === 'copy') {
           copyToClipboard(textarea.value, btn);
+          // Record to history on copy (if there's a transformation)
+          if (!state.historyPreview) {
+            recordToHistory(els.inputOriginal.value, els.inputResult.value);
+          }
         } else if (action === 'clear') {
           textarea.value = '';
           if (pane === 'original') {
@@ -395,7 +413,7 @@
     navigator.clipboard.writeText(text).then(function () {
       btn.classList.add('feedback');
       setTimeout(function () { btn.classList.remove('feedback'); }, 600);
-      showToast('Copied to clipboard');
+      showToast('Copied to clipboard', 'yellow');
     }).catch(function () {
       showToast('Copy failed');
     });
@@ -458,10 +476,27 @@
 
   function bindStatsUpdate() {
     els.inputOriginal.addEventListener('input', function () {
+      // If user types while previewing history, exit preview mode
+      if (state.historyPreview) {
+        state.historyPreview = false;
+        state.liveState = null;
+        els.previewBannerOrig.hidden = true;
+        els.previewBannerResult.hidden = true;
+        HistoryManager.setSelectedId(null);
+      }
       // Re-run pipeline when original text changes
       if (state.pipeline.length > 0) recompute();
       updateStats();
     });
+
+    // Enter key in original pane records to history
+    els.inputOriginal.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter' && !e.shiftKey && !state.historyPreview) {
+        // Record current state to history (don't prevent default — let Enter add newline)
+        recordToHistory(els.inputOriginal.value, els.inputResult.value);
+      }
+    });
+
     els.inputResult.addEventListener('input', updateStats);
   }
 
@@ -480,7 +515,7 @@
   // --- Toast ---
 
   var toastTimeout;
-  function showToast(message) {
+  function showToast(message, variant) {
     var toast = document.querySelector('.toast');
     if (!toast) {
       toast = document.createElement('div');
@@ -488,11 +523,206 @@
       document.body.appendChild(toast);
     }
     toast.textContent = message;
+    // Reset variant classes
+    toast.classList.remove('toast-yellow');
+    if (variant === 'yellow') {
+      toast.classList.add('toast-yellow');
+    }
     toast.classList.add('visible');
     clearTimeout(toastTimeout);
     toastTimeout = setTimeout(function () {
       toast.classList.remove('visible');
     }, 1500);
+  }
+
+  // --- History ---
+
+  function bindHistory() {
+    els.btnHistory.addEventListener('click', function () {
+      toggleHistoryPanel();
+    });
+
+    els.historyClose.addEventListener('click', function () {
+      closeHistoryPanel();
+    });
+
+    els.historyClearAll.addEventListener('click', function () {
+      HistoryManager.clear();
+      refreshHistoryPanel();
+      updateHistoryButton();
+      exitPreviewMode();
+      showToast('History cleared');
+    });
+
+    els.historyRestore.addEventListener('click', function () {
+      var id = HistoryManager.getSelectedId();
+      if (!id) return;
+      var entry = HistoryManager.getEntry(id);
+      if (entry) restoreFromHistory(entry);
+    });
+  }
+
+  function toggleHistoryPanel() {
+    var isHidden = els.historyPanel.hidden;
+    if (isHidden) {
+      openHistoryPanel();
+    } else {
+      closeHistoryPanel();
+    }
+  }
+
+  function openHistoryPanel() {
+    els.historyPanel.hidden = false;
+    els.btnHistory.classList.add('active');
+    refreshHistoryPanel();
+  }
+
+  function closeHistoryPanel() {
+    els.historyPanel.hidden = true;
+    els.btnHistory.classList.remove('active');
+    exitPreviewMode();
+  }
+
+  function refreshHistoryPanel() {
+    els.historyCount.textContent = HistoryManager.count();
+    els.historyRestore.disabled = !HistoryManager.getSelectedId();
+
+    HistoryManager.renderPanel(els.historyEntries, {
+      onSelect: function (entry) {
+        enterPreviewMode(entry);
+        els.historyRestore.disabled = false;
+      },
+      onRestore: function (entry) {
+        restoreFromHistory(entry);
+      },
+    });
+  }
+
+  /**
+   * Record current transformation to history.
+   */
+  function recordToHistory(original, result) {
+    if (!original || !result) return;
+    if (original === result) return;
+    if (state.pipeline.length === 0) return;
+
+    HistoryManager.record(original, state.pipeline, result);
+    updateHistoryButton();
+
+    // If panel is open, refresh it
+    if (!els.historyPanel.hidden) {
+      refreshHistoryPanel();
+    }
+  }
+
+  /**
+   * Show/hide the history toolbar button based on entry count.
+   */
+  function updateHistoryButton() {
+    var hasHistory = HistoryManager.count() > 0;
+    els.btnHistory.hidden = !hasHistory;
+  }
+
+  /**
+   * Enter preview mode: save current live state, load history entry into panes.
+   */
+  function enterPreviewMode(entry) {
+    // Save live state the first time we enter preview
+    if (!state.historyPreview) {
+      state.liveState = {
+        original: els.inputOriginal.value,
+        pipeline: state.pipeline.map(function (item) {
+          var copy = { op: item.op, enabled: item.enabled };
+          copy.params = item.params ? JSON.parse(JSON.stringify(item.params)) : null;
+          return copy;
+        }),
+        result: els.inputResult.value,
+      };
+    }
+
+    state.historyPreview = true;
+
+    // Load the history entry into panes
+    els.inputOriginal.value = entry.originalFull;
+    els.inputResult.value = entry.resultFull;
+
+    // Show preview banners
+    els.previewBannerOrig.hidden = false;
+    els.previewBannerResult.hidden = false;
+
+    // Update effects bar with the history entry's pipeline
+    state.pipeline = entry.pipeline.map(function (item) {
+      var copy = { op: item.op, enabled: item.enabled };
+      copy.params = item.params ? JSON.parse(JSON.stringify(item.params)) : null;
+      return copy;
+    });
+    renderEffectsBar();
+
+    if (state.diffActive) {
+      renderDiff();
+    }
+
+    updateStats();
+  }
+
+  /**
+   * Exit preview mode: restore the live working state.
+   */
+  function exitPreviewMode() {
+    if (!state.historyPreview) return;
+
+    state.historyPreview = false;
+
+    // Hide preview banners
+    els.previewBannerOrig.hidden = true;
+    els.previewBannerResult.hidden = true;
+
+    // Restore live state
+    if (state.liveState) {
+      els.inputOriginal.value = state.liveState.original;
+      state.pipeline = state.liveState.pipeline;
+      els.inputResult.value = state.liveState.result;
+      renderEffectsBar();
+
+      if (state.diffActive) {
+        renderDiff();
+      }
+
+      updateStats();
+      state.liveState = null;
+    }
+
+    HistoryManager.setSelectedId(null);
+    els.historyRestore.disabled = true;
+  }
+
+  /**
+   * Restore a history entry as the active working state.
+   */
+  function restoreFromHistory(entry) {
+    // Exit preview mode first (clear banners, but don't restore old state)
+    state.historyPreview = false;
+    state.liveState = null;
+
+    els.previewBannerOrig.hidden = true;
+    els.previewBannerResult.hidden = true;
+
+    // Set the entry as the active state
+    els.inputOriginal.value = entry.originalFull;
+    state.pipeline = entry.pipeline.map(function (item) {
+      var copy = { op: item.op, enabled: item.enabled };
+      copy.params = item.params ? JSON.parse(JSON.stringify(item.params)) : null;
+      return copy;
+    });
+
+    // Recompute to apply pipeline
+    recompute();
+
+    HistoryManager.setSelectedId(null);
+    els.historyRestore.disabled = true;
+
+    closeHistoryPanel();
+    showToast('Restored from history');
   }
 
   // --- Helpers ---
@@ -510,15 +740,68 @@
       e.preventDefault();
       toggleFindReplace();
     }
-    if (e.key === 'Escape' && !els.findReplaceBar.hidden) {
-      els.findReplaceBar.hidden = true;
-      els.btnFindReplace.classList.remove('active');
+    // Ctrl/Cmd + Y — toggle history panel
+    if ((e.ctrlKey || e.metaKey) && e.key === 'y') {
+      e.preventDefault();
+      toggleHistoryPanel();
+    }
+    if (e.key === 'Escape') {
+      // Close history panel first, then find/replace
+      if (!els.historyPanel.hidden) {
+        closeHistoryPanel();
+      } else if (!els.findReplaceBar.hidden) {
+        els.findReplaceBar.hidden = true;
+        els.btnFindReplace.classList.remove('active');
+      }
     }
   });
+
+  // --- Intro Modal ---
+
+  function initIntro() {
+    var STORAGE_KEY = 'tt-hide-intro';
+    var backdrop = document.getElementById('intro-backdrop');
+    var dismissBtn = document.getElementById('intro-dismiss');
+    var noShowCheck = document.getElementById('intro-no-show-check');
+
+    if (!backdrop) return;
+
+    // Check if user opted out
+    if (localStorage.getItem(STORAGE_KEY) === '1') {
+      backdrop.hidden = true;
+      return;
+    }
+
+    // Show the modal
+    backdrop.hidden = false;
+
+    function closeIntro() {
+      if (noShowCheck && noShowCheck.checked) {
+        localStorage.setItem(STORAGE_KEY, '1');
+      }
+      backdrop.hidden = true;
+    }
+
+    dismissBtn.addEventListener('click', closeIntro);
+
+    // Click backdrop to dismiss
+    backdrop.addEventListener('click', function (e) {
+      if (e.target === backdrop) closeIntro();
+    });
+
+    // Escape key to dismiss
+    document.addEventListener('keydown', function handler(e) {
+      if (e.key === 'Escape' && !backdrop.hidden) {
+        closeIntro();
+        document.removeEventListener('keydown', handler);
+      }
+    });
+  }
 
   // --- Start ---
 
   init();
+  initIntro();
 
   // Initialize Lucide icons after DOM is ready
   if (typeof lucide !== 'undefined') lucide.createIcons();

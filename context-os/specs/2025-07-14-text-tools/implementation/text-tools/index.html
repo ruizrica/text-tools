@@ -9,6 +9,38 @@
 </head>
 <body>
 
+  <!-- Intro Modal -->
+  <div class="intro-backdrop" id="intro-backdrop" hidden>
+    <div class="intro-modal" role="dialog" aria-label="Welcome to Text Tools" aria-modal="true">
+      <img src="assets/texttools.png" alt="Text Tools" class="intro-logo">
+      <p class="intro-tagline">Fast, private text transformations — right in your browser.</p>
+      <div class="intro-details">
+        <div class="intro-detail-row">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+          <span><strong>100% private.</strong> Nothing is stored on any server. All processing happens locally in your browser.</span>
+        </div>
+        <div class="intro-detail-row">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+          <span><strong>Works offline.</strong> No internet required after the first load. Zero external dependencies.</span>
+        </div>
+        <div class="intro-detail-row">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+          <span><strong>Open source.</strong> View the code, contribute, or fork it.
+            <a href="https://github.com/ruizrica/text-tools" target="_blank" rel="noopener" class="intro-link">github.com/ruizrica/text-tools</a>
+          </span>
+        </div>
+      </div>
+      <p class="intro-ephemeral">Session data is kept in memory only — refresh the page and everything is cleared.</p>
+      <div class="intro-actions">
+        <button class="intro-btn-primary" id="intro-dismiss">Get Started</button>
+      </div>
+      <label class="intro-no-show">
+        <input type="checkbox" id="intro-no-show-check">
+        <span>Don't show this again</span>
+      </label>
+    </div>
+  </div>
+
   <!-- Toolbar -->
   <nav class="toolbar" role="menubar" aria-label="Text operations">
 
@@ -93,8 +125,15 @@
       </div>
     </div>
 
-    <!-- Layout toggle (pinned top-right) -->
+    <!-- Pinned right controls -->
     <div class="toolbar-group toolbar-group-right">
+      <button class="tool-btn" id="btn-history" title="View history (Ctrl+Y)" hidden>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16">
+          <circle cx="12" cy="12" r="10"/>
+          <polyline points="12 6 12 12 16 14"/>
+        </svg>
+        <span class="tool-label">History</span>
+      </button>
       <button class="tool-btn" id="btn-layout-toggle" title="Toggle layout">
         <i data-lucide="columns-2" id="layout-icon"></i>
         <span class="tool-label">Layout</span>
@@ -135,6 +174,33 @@
     <span class="stat" id="stat-lines">0 lines</span>
   </div>
 
+  <!-- History Panel -->
+  <section class="history-panel" id="history-panel" hidden>
+    <div class="history-header">
+      <div class="history-header-left">
+        <span class="history-title">History</span>
+        <span class="history-count" id="history-count">0</span>
+      </div>
+      <button class="history-close" id="history-close" title="Close history">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="18" y1="6" x2="6" y2="18"/>
+          <line x1="6" y1="6" x2="18" y2="18"/>
+        </svg>
+      </button>
+    </div>
+    <div class="history-col-labels">
+      <span class="history-label-time">Time</span>
+      <span class="history-label-original">Original</span>
+      <span class="history-label-ops">Operations</span>
+      <span class="history-label-result">Result</span>
+    </div>
+    <div class="history-entries" id="history-entries"></div>
+    <div class="history-footer">
+      <button class="history-btn history-btn-clear" id="history-clear-all">Clear History</button>
+      <button class="history-btn history-btn-restore" id="history-restore" disabled>Restore</button>
+    </div>
+  </section>
+
   <!-- Main Panes -->
   <main class="panes" id="panes">
 
@@ -156,6 +222,9 @@
             </svg>
           </button>
         </div>
+      </div>
+      <div class="history-preview-banner" id="preview-banner-original" hidden>
+        Previewing history entry
       </div>
       <textarea class="pane-textarea" id="input-original" placeholder="Paste your text here..." spellcheck="false"></textarea>
     </section>
@@ -197,6 +266,9 @@
           </svg>
         </button>
       </div>
+      <div class="history-preview-banner" id="preview-banner-result" hidden>
+        Click Restore to use this result
+      </div>
       <textarea class="pane-textarea" id="input-result" placeholder="Result will appear here..." spellcheck="false"></textarea>
       <div class="diff-overlay" id="diff-overlay" hidden></div>
     </section>
@@ -225,7 +297,9 @@
 
   <script src="operations.js"></script>
   <script src="diff.js"></script>
+  <script src="history.js"></script>
   <script src="app.js"></script>
+  <script data-name="BMC-Widget" data-cfasync="false" src="https://cdnjs.buymeacoffee.com/1.0.0/widget.prod.min.js" data-id="ruizrica" data-description="Support me on Buy me a coffee!" data-message="" data-color="#5F7FFF" data-position="Right" data-x_margin="18" data-y_margin="78"></script>
 
 </body>
 </html>
