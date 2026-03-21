@@ -1,0 +1,18 @@
+# Local tooling / session data (may contain absolute paths)
+.context/
+.claude/
+
+# Editor / IDE
+.cursor/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Secrets / local env (if ever added)
+.env
+.env.*
+!.env.example
+
+# Logs
+*.log
