@@ -180,7 +180,7 @@
     }
 
     els.effectsBar.hidden = false;
-    els.effectsList.innerHTML = '';
+    els.effectsList.replaceChildren();
 
     state.pipeline.forEach(function (item, idx) {
       var pill = document.createElement('button');
@@ -193,12 +193,30 @@
         label = '"' + item.params.find + '" → "' + item.params.replace + '"';
       }
 
-      pill.innerHTML = '<span class="pill-label">' + escapeHTML(label) + '</span>'
-        + '<span class="pill-remove">'
-        + '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"'
-        + ' stroke-linecap="round" stroke-linejoin="round">'
-        + '<line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>'
-        + '</svg></span>';
+      var pillLabel = document.createElement('span');
+      pillLabel.className = 'pill-label';
+      pillLabel.textContent = label;
+
+      var pillRemove = document.createElement('span');
+      pillRemove.className = 'pill-remove';
+      var svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+      svg.setAttribute('viewBox', '0 0 24 24');
+      svg.setAttribute('fill', 'none');
+      svg.setAttribute('stroke', 'currentColor');
+      svg.setAttribute('stroke-width', '3');
+      svg.setAttribute('stroke-linecap', 'round');
+      svg.setAttribute('stroke-linejoin', 'round');
+      var line1 = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+      line1.setAttribute('x1', '18'); line1.setAttribute('y1', '6');
+      line1.setAttribute('x2', '6'); line1.setAttribute('y2', '18');
+      var line2 = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+      line2.setAttribute('x1', '6'); line2.setAttribute('y1', '6');
+      line2.setAttribute('x2', '18'); line2.setAttribute('y2', '18');
+      svg.appendChild(line1);
+      svg.appendChild(line2);
+      pillRemove.appendChild(svg);
+      pill.appendChild(pillLabel);
+      pill.appendChild(pillRemove);
 
       // Left click toggles enabled/disabled
       pill.addEventListener('click', function (e) {
@@ -460,7 +478,7 @@
     if (!original && !result) { hideDiff(); return; }
 
     var segments = DiffEngine.computeDiff(original, result);
-    els.diffOverlay.innerHTML = DiffEngine.renderHTML(segments);
+    els.diffOverlay.replaceChildren(DiffEngine.renderDOM(segments));
     els.diffOverlay.hidden = false;
     els.inputResult.style.visibility = 'hidden';
   }

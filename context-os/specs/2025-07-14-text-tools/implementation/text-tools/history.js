@@ -182,7 +182,7 @@ const HistoryManager = (function () {
    * @param {object} callbacks - { onSelect(entry), onRestore(entry) }
    */
   function renderPanel(containerEl, callbacks) {
-    containerEl.innerHTML = '';
+    containerEl.replaceChildren();
 
     var displayEntries = getEntries();
 

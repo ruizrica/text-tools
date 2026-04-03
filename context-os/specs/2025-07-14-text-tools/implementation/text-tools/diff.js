@@ -163,6 +163,22 @@ const DiffEngine = {
   },
 
   /**
+   * Render diff segments as a DocumentFragment using safe DOM APIs.
+   * Returns a DocumentFragment ready for replaceChildren().
+   */
+  renderDOM(segments) {
+    const frag = document.createDocumentFragment();
+    segments.forEach(seg => {
+      const span = document.createElement('span');
+      const classMap = { removed: 'diff-removed', added: 'diff-added', equal: 'diff-equal' };
+      span.className = classMap[seg.type] || 'diff-equal';
+      span.textContent = seg.value;
+      frag.appendChild(span);
+    });
+    return frag;
+  },
+
+  /**
    * Escape HTML special characters.
    */
   escapeHTML(str) {
